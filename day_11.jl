@@ -1,4 +1,4 @@
-"""
+#=
 --- Day 11: Corporate Policy ---
 
 Santa's previous password expired, and he needs help choosing a new one.
@@ -20,7 +20,7 @@ abbcegjk fails the third requirement, because it only has one double letter (bb)
 The next password after abcdefgh is abcdffaa.
 The next password after ghijklmn is ghjaabcc, because you eventually skip all the passwords that start with ghi..., since i is not allowed.
 Given Santa's current password (your puzzle input), what should his next password be?
-"""
+=#
 
 function increment(password)
     # Will break on "zzzzzzzz". Oh well.

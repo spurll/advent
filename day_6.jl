@@ -1,4 +1,4 @@
-"""
+#=
 --- Day 6: Probably a Fire Hazard ---
 
 Because your neighbors keep defeating you in the holiday house decorating contest year after year, you've decided to deploy one million lights in a 1000x1000 grid.
@@ -38,7 +38,7 @@ For example:
 
 turn on 0,0 through 0,0 would increase the total brightness by 1.
 toggle 0,0 through 999,999 would increase the total brightness by 2000000.
-"""
+=#
 
 grid_1 = falses(1000, 1000)
 grid_2 = zeros(Integer, 1000, 1000)

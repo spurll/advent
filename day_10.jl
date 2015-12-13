@@ -1,4 +1,4 @@
-"""
+#=
 --- Day 10: Elves Look, Elves Say ---
 
 Today, the Elves are playing a game called look-and-say. They take turns making sequences by reading aloud the previous sequence and using that reading as the next sequence. For example, 211 is read as "one two, two ones", which becomes 1221 (1 2, 2 1s).
@@ -23,7 +23,7 @@ The first half of this puzzle is complete! It provides one gold star: *
 Neat, right? You might also enjoy hearing John Conway talking about this sequence (that's Conway of Conway's Game of Life fame).
 
 Now, starting again with the digits in your puzzle input, apply this process 50 times. What is the length of the new result?
-"""
+=#
 
 input = "3113322113"
 
