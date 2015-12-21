@@ -106,7 +106,7 @@ println(length(unique(results)))
 
 # This doesn't seem to be a particularly sound strategy (although it works for this input).
 # It would be better to do a recursive depth-first search in case this strategy results in
-# a dead end, allowing one to back-track. But I could be wrong.
+# a dead end, allowing one to back-track.
 step = 0
 results = medicine
 while results != "e"
