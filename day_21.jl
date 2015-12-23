@@ -82,8 +82,7 @@ end
 hit!(atk, def) = (def.hp -= max(1, atk.damage - def.armor)) > 0
 
 function win(player, boss)
-    while hit!(player, boss)
-        hit!(boss, player)
+    while hit!(player, boss) && hit!(boss, player)
     end
     return player.hp > 0
 end
