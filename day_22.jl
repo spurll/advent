@@ -162,110 +162,89 @@ type Effect
     action::Function
 end
 
-function boss_hit()
-    damage = max(1, boss.damage - player.armor)
-    println("Boss hits player for $damage damage.")
-    (player.hp -= damage) <= 0
+function copy(c::Character)
+    return Character(c.hp, c.damage, c.armor, c.mp)
 end
 
-function player_cast(spell::Spell)
-    player.mp -= spell.cost
-
-    (player.mp < 0) && return false
-
-    println("Player casts $(spell.name).")
-    spell.action()
-    return boss.hp > 0
+function copy(effect::Effect)
+    return Effect(effect.name, effect.timer, effect.action)
 end
 
-function resolve_effects()
+function resolve!(player, boss, effects)
     for effect in effects
-        println("Resolving the effect of $(effect.name)...")
         effect.timer -= 1
-        effect.action(effect.timer)
+        effect.action(player, boss, effect.timer)
     end
     filter!(effect -> effect.timer > 0, effects)
 end
 
-function print_stats()
-    println("\nPLAYER: $(player.hp) HP, $(player.mp) MP, $(player.armor) armor")
-    println("BOSS: $(boss.hp) HP, $(boss.damage) damage\n")
-
-    if boss.hp <= 0
-        println("BOSS IS DEAD!\n")
-    end
-    if (player.hp <= 0) || (player.mp < 0)
-        println("PLAYER IS DEAD!\n")
-    end
+# A spell is castable if its effect isn't ongoing (or if its effect is about to end).
+function castable(spell, effects)
+    index = findfirst(effect -> effect.name == spell.name, effects)
+    return (index == 0) || (effects[index].timer <= 1)
 end
 
-function hard_mode()
-    println("HARD MODE: Player loses 1 HP.")
-    return (player.hp -= 1) <= 0
-end
+# Returns the minimum amount of mana spent to win. If you lose, returns Inf.
+function simulate(player, boss, spell, effects, hard, spent)
+    # Hard mode.
+    hard && ((player.hp -= 1) <= 0) && return Inf
 
-function win(spell_chain)
-    for spell in spell_chain
-        print_stats()
+    # Resolve effects for player's turn.
+    resolve!(player, boss, effects)
+    (boss.hp <= 0) && return spent
 
-        hard && hard_mode() && return false
+    # Cast the selected spell.
+    player.mp -= spell.cost
+    spent += spell.cost
+    spell.action(player, boss, effects)
+    (boss.hp <= 0) && return spent
 
-        resolve_effects()
+    # Resolve effects for boss's turn.
+    resolve!(player, boss, effects)
+    (boss.hp <= 0) && return spent
 
-        if player_cast(spell)
-            active_effects = [effect.name for effect in effects]
-            if length(active_effects) > length(unique(active_effects))
-                println("\nMulitple effects of same type active. Invalid spell cast!")
-                return false
-            end
+    # Boss takes a swing.
+    ((player.hp -= max(1, boss.damage - player.armor)) <= 0) && return Inf
 
-            resolve_effects()
-            if boss_hit()
-                print_stats()
-                return false
-            end
+    # Select next spell (and recursive calls).
+    lowest_cost = Inf
+    for next_spell in spells
+        if (next_spell.cost > player.mp) || (spent + next_spell.cost >= lowest_cost) ||
+            !castable(next_spell, effects)
+            continue
         end
 
-        if player.mp < 0
-            print_stats()
-            return false
+        # Send copies down the line to preserve state.
+        chain_cost = simulate(
+            copy(player), copy(boss), next_spell, deepcopy(effects), hard, spent
+        )
+
+        if chain_cost < lowest_cost
+            lowest_cost = chain_cost
         end
     end
 
-    (boss.hp > 0) && println("\nPlayer out of spells!")
-
-    return boss.hp <= 0
-end
-
-# Find all combinations of spells that have the specified combined mana cost.
-function select_spells!(chains, spells, mana, current_chain=nothing)
-    if is(current_chain, nothing)
-        current_chain = Spell[]
-    end
-
-    total_cost = sum(Int[spell.cost for spell in current_chain])
-    (total_cost == mana) && push!(chains, current_chain)
-    (total_cost >= mana) && return
-
-    for spell in spells
-        select_spells!(chains, spells, mana, Spell[current_chain; spell])
-    end
+    return lowest_cost
 end
 
 # I am become Death, destroyer of code.
 spells = [
-    Spell("Magic Missile", 53, () -> boss.hp -= 4),
-    Spell("Drain", 73, function ()
+    Spell("Magic Missile", 53, (player, boss, effects) -> boss.hp -= 4),
+    Spell("Drain", 73, function (player, boss, effects)
         boss.hp -= 2
         player.hp += 2
     end),
-    Spell("Shield", 113, function ()
+    Spell("Shield", 113, function (player, boss, effects)
         player.armor += 7
-        push!(effects, Effect("Shield", 6, timer -> if timer == 0 player.armor -= 7 end))
+        push!(effects, Effect(
+            "Shield", 6, (player, boss, timer) -> if timer == 0 player.armor -= 7 end
+        ))
     end),
-    Spell("Poison", 173, () -> push!(effects, Effect("Poison", 6, timer -> boss.hp -= 3))),
-    Spell("Recharge", 229,
-        () -> push!(effects, Effect("Recharge", 5, timer -> player.mp += 101))
+    Spell("Poison", 173, (player, boss, effects) ->
+        push!(effects, Effect("Poison", 6, (player, boss, timer) -> boss.hp -= 3))
+    ),
+    Spell("Recharge", 229, (player, boss, effects) ->
+        push!(effects, Effect("Recharge", 5, (player, boss, timer) -> player.mp += 101))
     )
 ]
 
@@ -273,29 +252,20 @@ f = open("day_22.txt")
 input = readall(f)
 close(f)
 
-boss_stats = (
+boss = Character(
     parse(match(r"Hit Points: (\d+)", input).captures...),
     parse(match(r"Damage: (\d+)", input).captures...),
     0, 0
 )
+player = Character(50, 0, 0, 500)
 
-mana = min(map(spell -> spell.cost, spells)...) - 1
-hard = true
-done = false
-effects = []
-player = NaN
-boss = NaN
-while !done
-    mana += 1
-    chains = []
-    select_spells!(chains, spells, mana)
-    !isempty(chains) && println("Found $(length(chains)) spell chains that cost $mana...")
-    for spell_chain in chains
-        effects = []
-        println("\n-------------- $(mana) ---------------")
-        player, boss = Character(50, 0, 0, 500), Character(boss_stats...)
-        (done = win(spell_chain)) && break
+# Seems to take too long for non-hard mode. Previous solution works for that, though.
+spent = Inf
+for spell in spells
+    lowest_cost = simulate(copy(player), copy(boss), spell, [], true, 0)
+    if spent > lowest_cost
+        spent = lowest_cost
     end
 end
 
-println("Spent $mana mana to win.")
+println("Spent $(spent) mana to win.")
